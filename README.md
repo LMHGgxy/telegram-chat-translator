@@ -13,7 +13,7 @@ pip3 install -r requirements.txt
 ## Environment Variables
 
 To run this project, you will need to add the following environment variables to your .env file
-------------------
+
 | variables| data |
 |----------|------
 |`ID_ONE`  | your id
