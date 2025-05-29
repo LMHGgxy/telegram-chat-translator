@@ -1,8 +1,8 @@
+import asyncio
 import telebot
 from os import getenv
 from python_translator import Translator
 from telebot.async_telebot import AsyncTeleBot
-import asyncio
 
 bot = AsyncTeleBot(getenv('TOKEN'))
 
@@ -11,35 +11,49 @@ id_1_lang = getenv('LANG_ONE')
 id_2 = int(getenv('ID_TWO'))
 id_2_lang = getenv('LANG_TWO')
 
+translator = Translator()
+
 @bot.message_handler(commands=["start"])
 async def start(message):
-    await bot.reply_to(message,"the bot are running")
+    await bot.reply_to(message, "Bot activo y escuchando.")
 
+@bot.message_handler(content_types=['text'])
+async def handle_text(message):
+    try:
+        from_id = message.from_user.id
+        target_id = id_1 if from_id == id_2 else id_2 if from_id == id_1 else None
 
-@bot.message_handler(func=lambda message: True, content_types=['text'])
-async def echo_message(message):
-    if message.from_user.id == id_2:
-        await bot.send_message(chat_id=id_1, text=Translator().translate(
-            message.text, id_1_lang, id_2_lang), parse_mode='HTML')
-    elif message.from_user.id == id_1:
-        await bot.send_message(chat_id=id_2, text=Translator().translate(
-            message.text, id_2_lang, id_1_lang), parse_mode='HTML')
+        if not target_id:
+            return
 
+        source_lang = id_2_lang if from_id == id_1 else id_1_lang
+        target_lang = id_1_lang if from_id == id_2 else id_2_lang
 
-@bot.message_handler(func=lambda message: True, content_types=['document', 'video', 'photo', 'sticker'])
-async def handle_files(message):
-    if message.from_user.id == id_2:
-        await bot.forward_message(id_1, message.chat.id, message.message_id)
+        translated_text = translator.translate(message.text, target_lang, source_lang)
+        await bot.send_message(chat_id=target_id, text=translated_text, parse_mode='HTML')
+    except Exception as e:
+        await bot.send_message(message.chat.id, f"Error en traducción: {e}")
+
+@bot.message_handler(content_types=['document', 'video', 'photo', 'sticker'])
+async def handle_media(message):
+    try:
+        from_id = message.from_user.id
+        target_id = id_1 if from_id == id_2 else id_2 if from_id == id_1 else None
+
+        if not target_id:
+            return
+
+        await bot.forward_message(chat_id=target_id, from_chat_id=message.chat.id, message_id=message.message_id)
+
         if message.caption:
-            message_text = f"<code>CAPTION TRADUCIDO: </code> {message.caption}"
-            await bot.send_message(chat_id=id_1, text=Translator().translate(
-                message_text, id_1_lang, id_2_lang), parse_mode='HTML')
-    elif message.from_user.id == id_1:
-        await bot.forward_message(id_2, message.chat.id, message.message_id)
-        if message.caption:
-            message_text = f"<code>CAPTION TRADUCIDO: </code> {message.caption}"
-            await bot.send_message(chat_id=id_2, text=Translator().translate(
-                message_text, id_2_lang, id_1_lang), parse_mode='HTML')
+            source_lang = id_2_lang if from_id == id_1 else id_1_lang
+            target_lang = id_1_lang if from_id == id_2 else id_2_lang
+            translated_caption = translator.translate(message.caption, target_lang, source_lang)
+            caption_text = f"<code>CAPTION TRADUCIDO:</code> {translated_caption}"
+            await bot.send_message(chat_id=target_id, text=caption_text, parse_mode='HTML')
 
+    except Exception as e:
+        await bot.send_message(message.chat.id, f"Error en reenvío o traducción: {e}")
 
-asyncio.run(bot.infinity_polling())
+if __name__ == "__main__":
+    asyncio.run(bot.infinity_polling())
